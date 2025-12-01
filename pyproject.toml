@@ -1,0 +1,15 @@
+[project]
+name = "syrano"
+version = "0.1.0"
+description = "Default template for PDM package"
+authors = [
+    {name = "griotold", email = "gotjd9773@naver.com"},
+]
+dependencies = ["fastapi>=0.123.0", "uvicorn[standard]>=0.38.0"]
+requires-python = "==3.12.*"
+readme = "README.md"
+license = {text = "MIT"}
+
+
+[tool.pdm]
+distribution = false
