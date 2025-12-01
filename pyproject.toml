@@ -5,7 +5,7 @@ description = "Default template for PDM package"
 authors = [
     {name = "griotold", email = "gotjd9773@naver.com"},
 ]
-dependencies = ["fastapi>=0.123.0", "uvicorn[standard]>=0.38.0", "langchain>=1.1.0", "langchain-openai>=1.1.0", "python-dotenv>=1.2.1"]
+dependencies = ["fastapi>=0.123.0", "uvicorn[standard]>=0.38.0", "langchain>=1.1.0", "langchain-openai>=1.1.0", "python-dotenv>=1.2.1", "sqlalchemy[asyncio]>=2.0.44", "asyncpg>=0.31.0"]
 requires-python = "==3.12.*"
 readme = "README.md"
 license = {text = "MIT"}

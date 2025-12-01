@@ -2,14 +2,22 @@ import logging
 from typing import List, Literal
 
 from fastapi import FastAPI, HTTPException
+
 from pydantic import BaseModel
 
+from app.db import init_db
 from app.services.llm import generate_suggestions_from_conversation
 
 app = FastAPI(title="Syrano API")
 
 logger = logging.getLogger("syrano")
 logging.basicConfig(level=logging.INFO)
+
+@app.on_event("startup")
+async def on_startup():
+    logger.info("Initializing database...")
+    await init_db()
+    logger.info("Database initialized.")
 
 @app.get("/health")
 def health_check():
