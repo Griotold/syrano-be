@@ -32,6 +32,7 @@ class Subscription(Base):
     )
 
     is_premium: Mapped[bool] = mapped_column(Boolean, default=False)
+    # weekly, monthly
     plan_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
