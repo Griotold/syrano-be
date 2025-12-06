@@ -2,6 +2,7 @@ import logging
 
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.db import init_db
 from app.routers import rizz, auth, billing
@@ -10,6 +11,15 @@ logger = logging.getLogger("syrano")
 logging.basicConfig(level=logging.INFO)
 
 app = FastAPI(title="Syrano API")
+
+# CORS 설정 (개발 단계라 일단 * 허용, 운영에서 좁히면 됨)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],          # TODO: 운영에서는 실제 도메인으로 제한
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
