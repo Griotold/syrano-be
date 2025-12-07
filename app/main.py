@@ -10,17 +10,6 @@ from app.routers import rizz, auth, billing
 logger = logging.getLogger("syrano")
 logging.basicConfig(level=logging.INFO)
 
-app = FastAPI(title="Syrano API")
-
-# CORS 설정 (개발 단계라 일단 * 허용, 운영에서 좁히면 됨)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],          # TODO: 운영에서는 실제 도메인으로 제한
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # startup
@@ -33,11 +22,21 @@ async def lifespan(app: FastAPI):
     # shutdown (필요하면 연결 정리, 리소스 반환 등 여기에)
     logger.info("Shutting down Syrano API...")
 
+app = FastAPI(title="Syrano API", lifespan=lifespan)
+
+# CORS 설정 (개발 단계라 일단 * 허용, 운영에서 좁히면 됨)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],          # TODO: 운영에서는 실제 도메인으로 제한
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
-
 
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(rizz.router, prefix="/rizz", tags=["rizz"])
