@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.orm import DeclarativeBase
 
-from app.services.config import DATABASE_URL
+from app.services.config import DATABASE_URL, SQLALCHEMY_ECHO
 
 
 class Base(DeclarativeBase):
@@ -18,7 +18,7 @@ class Base(DeclarativeBase):
 
 engine = create_async_engine(
     DATABASE_URL,
-    echo=True,      # 네가 지금 개발 중이라면 True OK
+    echo=SQLALCHEMY_ECHO,      
     future=True,
 )
 
