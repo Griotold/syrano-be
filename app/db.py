@@ -20,6 +20,7 @@ engine = create_async_engine(
     DATABASE_URL,
     echo=SQLALCHEMY_ECHO,      
     future=True,
+    connect_args={"ssl": "require"}
 )
 
 AsyncSessionLocal = async_sessionmaker(
