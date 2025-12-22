@@ -15,3 +15,9 @@ if OPENAI_API_KEY is None:
 
 if DATABASE_URL is None:
     raise RuntimeError("DATABASE_URL is not set. Please add it to your .env file.")
+
+# 로컬 개발 환경이면 SSL 비활성화 파라미터 추가
+if "localhost" in DATABASE_URL or "127.0.0.1" in DATABASE_URL:
+    if "ssl" not in DATABASE_URL.lower():
+        separator = "&" if "?" in DATABASE_URL else "?"
+        DATABASE_URL = f"{DATABASE_URL}{separator}ssl=disable"

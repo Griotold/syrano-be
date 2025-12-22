@@ -2,7 +2,7 @@ from typing import List
 
 from langchain_openai import ChatOpenAI
 
-from app.services.config import (
+from app.config import (
     OPENAI_API_KEY,
     OPENAI_STANDARD_MODEL,
     OPENAI_PREMIUM_MODEL,
