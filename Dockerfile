@@ -8,10 +8,16 @@ ENV PYTHONUNBUFFERED=1
 # 3. 워킹 디렉토리
 WORKDIR /app
 
-# 4. 시스템 의존성 (psycopg, asyncpg 등 위해)
+# 4. 시스템 의존성 (EasyOCR을 위한 OpenCV 라이브러리 추가)
 RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    libgl1-mesa-glx \
     && rm -rf /var/lib/apt/lists/*
 
 # 5. 의존성 파일만 먼저 복사 (레이어 캐싱)
