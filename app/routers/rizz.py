@@ -12,7 +12,8 @@ import aiofiles
 from app.db import get_session
 from app.services.llm import generate_suggestions_from_conversation
 from app.services.subscriptions import get_subscription_by_user_id
-from app.services.ocr import extract_text_from_image
+from app.services.ocr.naver import NaverOCRService
+from app.config import NAVER_OCR_SECRET_KEY, NAVER_OCR_INVOKE_URL   
 from app.schemas.rizz import GenerateRequest, GenerateResponse
 
 logger = logging.getLogger("syrano")
@@ -94,7 +95,7 @@ async def analyze_image(
     이미지 기반 Rizz 메시지 생성 엔드포인트.
     
     1. 이미지를 임시 저장
-    2. EasyOCR로 텍스트 추출
+    2. Naver Clova OCR로 텍스트 추출
     3. LLM으로 답변 생성
     4. 임시 파일 삭제
     """
@@ -127,7 +128,11 @@ async def analyze_image(
         logger.info(f"Image saved to {file_path}, size: {len(content)} bytes")
         
         # 4) OCR 실행
-        conversation = await extract_text_from_image(file_path)
+        ocr_service = NaverOCRService(
+            secret_key=NAVER_OCR_SECRET_KEY,
+            invoke_url=NAVER_OCR_INVOKE_URL
+        )
+        conversation = await ocr_service.extract_text(file_path)
         
         logger.info(f"Extracted text length: {len(conversation)} characters")
         logger.info(f"Extracted text preview: {conversation[:100]}...")

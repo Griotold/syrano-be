@@ -1,7 +1,7 @@
 # Syrano Backend (syrano-be)
 
 Backend API for **Syrano**, a Korean RizzGPT-style assistant that generates attractive and context-aware chat messages.
-Built with **FastAPI**, **SQLAlchemy (async)**, **LangChain**, and **PostgreSQL**.
+Built with **FastAPI**, **SQLAlchemy (async)**, **LangChain**, **Naver Clova OCR**, and **PostgreSQL**.
 
 ---
 
@@ -13,8 +13,9 @@ Built with **FastAPI**, **SQLAlchemy (async)**, **LangChain**, and **PostgreSQL*
 - **ORM:** SQLAlchemy 2.0 (Async)
 - **Database:** PostgreSQL (Docker)
 - **LLM Provider:** OpenAI (via `langchain-openai`)
+- **OCR Provider:** Naver Clova OCR (General OCR, Premium)
 - **Config:** python-dotenv
-- **Infra (planned):** DigitalOcean (App Platform or Droplet)
+- **Infra:** DigitalOcean App Platform
 
 ---
 
@@ -24,6 +25,7 @@ Built with **FastAPI**, **SQLAlchemy (async)**, **LangChain**, and **PostgreSQL*
 syrano/
   app/
     main.py                  # FastAPI entrypoint (lifespan, CORS, router wiring)
+    config.py                # Environment config loader (.env / os.environ)
     db.py                    # Database engine/session/init
     models/                  # SQLAlchemy models
       __init__.py
@@ -34,14 +36,22 @@ syrano/
     routers/
       auth.py                # /auth endpoints (anonymous, subscription status)
       billing.py             # /billing endpoints (premium activation)
-      rizz.py                # /rizz endpoints (message generation)
+      rizz.py                # /rizz endpoints (text & image-based message generation)
     services/
-      config.py              # Environment config loader (.env / os.environ)
       llm.py                 # LangChain + OpenAI LLM handler
       users.py               # User-related helpers
       subscriptions.py       # Subscription-related helpers
+      ocr/                   # OCR service (Protocol pattern)
+        __init__.py          # Empty
+        base.py              # OCRService Protocol
+        naver.py             # NaverOCRService implementation
+    schemas/
+      rizz.py                # Request/Response DTOs
+  docs/
+    ocr-integration.md       # OCR 통합 과정 문서
   .env                       # Environment variables (ignored by Git)
   pyproject.toml             # PDM configuration
+  Dockerfile                 # Docker build configuration
   .gitignore
   README.md
 ```
@@ -55,11 +65,15 @@ Create a `.env` file in the project root **for local development**:
 ```env
 # OpenAI
 OPENAI_API_KEY=sk-...
-OPENAI_STANDARD_MODEL=gpt-4.1-mini
-OPENAI_PREMIUM_MODEL=gpt-4.1
+OPENAI_STANDARD_MODEL=gpt-4o-mini
+OPENAI_PREMIUM_MODEL=gpt-4o
 
 # Database
 DATABASE_URL=postgresql+asyncpg://syrano:syrano@localhost:5432/syrano
+
+# Naver Clova OCR
+NAVER_OCR_SECRET_KEY=xxxxx
+NAVER_OCR_INVOKE_URL=https://xxxxx.apigw.ntruss.com/custom/v1/.../general
 
 # SQLAlchemy debug logging (development only)
 SQLALCHEMY_ECHO=true
@@ -67,7 +81,7 @@ SQLALCHEMY_ECHO=true
 
 > `.env` is already included in `.gitignore`.
 
-In production (DigitalOcean etc.), these should be configured as **environment variables** in the platform, not via `.env` committed to the repo.
+In production (DigitalOcean), these should be configured as **App-Level Environment Variables**.
 
 ---
 
@@ -76,7 +90,13 @@ In production (DigitalOcean etc.), these should be configured as **environment v
 Create and start a persistent PostgreSQL container (first time only):
 
 ```bash
-docker run --name syrano-postgres   -e POSTGRES_USER=syrano   -e POSTGRES_PASSWORD=syrano   -e POSTGRES_DB=syrano   -p 5432:5432   -v syrano_pgdata:/var/lib/postgresql/data   -d postgres:16
+docker run --name syrano-postgres \
+  -e POSTGRES_USER=syrano \
+  -e POSTGRES_PASSWORD=syrano \
+  -e POSTGRES_DB=syrano \
+  -p 5432:5432 \
+  -v syrano_pgdata:/var/lib/postgresql/data \
+  -d postgres:16
 ```
 
 Useful commands:
@@ -134,7 +154,7 @@ Expected:
 | created_at| TIMESTAMPTZ | Row creation time                            |
 
 > For MVP, `weekly` and `monthly` are interpreted as **7 days** and **30 days** from activation.
-> The UI should label these as e.g. “7-day pass”, “30-day pass” to match behavior.
+> The UI should label these as e.g. "7-day pass", "30-day pass" to match behavior.
 
 ---
 
@@ -228,7 +248,9 @@ Create (or reuse) an anonymous user and ensure a default subscription exists.
 **Request**
 
 ```bash
-curl -X POST "http://127.0.0.1:8000/auth/anonymous"   -H "Content-Type: application/json"   -d '{}'
+curl -X POST "http://127.0.0.1:8000/auth/anonymous" \
+  -H "Content-Type: application/json" \
+  -d '{}'
 ```
 
 Optionally, an existing `user_id` can be passed:
@@ -295,7 +317,9 @@ Activate a premium subscription for a user.
 **Request**
 
 ```bash
-curl -X POST "http://127.0.0.1:8000/billing/subscribe"   -H "Content-Type: application/json"   -d '{
+curl -X POST "http://127.0.0.1:8000/billing/subscribe" \
+  -H "Content-Type: application/json" \
+  -d '{
     "user_id": "0653a764-b671-4334-8daa-685b060f2b6e",
     "plan_type": "monthly"
   }'
@@ -321,9 +345,9 @@ After this, `GET /auth/me/subscription` will reflect the updated premium status.
 
 ---
 
-### 4) `POST /rizz/generate` – Rizz Message Generation
+### 4) `POST /rizz/generate` – Text-Based Message Generation
 
-Generate attractive, context-aware reply suggestions based on the conversation.
+Generate attractive, context-aware reply suggestions based on conversation text.
 
 **Important:**  
 - `user_id` is **required**.
@@ -332,8 +356,9 @@ Generate attractive, context-aware reply suggestions based on the conversation.
 **Request**
 
 ```bash
-curl -X POST "http://127.0.0.1:8000/rizz/generate"   -H "Content-Type: application/json"   -d '{
-    "mode": "conversation",
+curl -X POST "http://127.0.0.1:8000/rizz/generate" \
+  -H "Content-Type: application/json" \
+  -d '{
     "conversation": "어제 소개팅 하고 오늘 첫 연락 보내려는데 뭐라고 해야 할지 모르겠어",
     "platform": "kakao",
     "relationship": "first_meet",
@@ -344,7 +369,7 @@ curl -X POST "http://127.0.0.1:8000/rizz/generate"   -H "Content-Type: applicati
   }'
 ```
 
-**Response (example)**
+**Response**
 
 ```json
 {
@@ -356,16 +381,61 @@ curl -X POST "http://127.0.0.1:8000/rizz/generate"   -H "Content-Type: applicati
 }
 ```
 
-**Internal flow:**
+---
 
-1. Look up `Subscription` by `user_id`.
-2. If not found → `404` (client should call `/auth/anonymous` first).
-3. Decide `is_premium` from DB.
-4. Select appropriate LLM model:
-   - Standard model for free users
-   - Premium model for paying users
-5. Build a Korean “Rizz assistant” prompt and call OpenAI via LangChain.
-6. Parse response into a list of suggestions.
+### 5) `POST /rizz/analyze-image` – Image-Based Message Generation (NEW)
+
+Generate reply suggestions by extracting text from a chat screenshot using **Naver Clova OCR**.
+
+**Request (multipart/form-data)**
+
+```bash
+curl -X POST "http://127.0.0.1:8000/rizz/analyze-image" \
+  -F "image=@screenshot.png" \
+  -F "user_id=cdcbad1a-d960-48f3-961a-5b08ae87ad60" \
+  -F "platform=kakao" \
+  -F "relationship=first_meet" \
+  -F "style=banmal" \
+  -F "tone=friendly" \
+  -F "num_suggestions=3"
+```
+
+**Response**
+
+```json
+{
+  "suggestions": [
+    "나도 이제 좀 쉬려고 해, 오늘 하루 어땠어?",
+    "저녁 맛있게 먹었어? 난 간단히 먹었어ㅎㅎ",
+    "프리한 시간 진짜 좋지, 뭐하고 놀아?"
+  ]
+}
+```
+
+**Flow:**
+
+1. Save uploaded image temporarily
+2. Extract text using Naver Clova OCR (95%+ accuracy)
+3. Generate suggestions via LLM
+4. Delete temporary file
+5. Return suggestions
+
+**OCR Service Architecture (Protocol Pattern):**
+
+```python
+# app/services/ocr/base.py
+class OCRService(Protocol):
+    async def extract_text(self, image_path: str | Path) -> str:
+        ...
+
+# app/services/ocr/naver.py
+class NaverOCRService:
+    async def extract_text(self, image_path: str | Path) -> str:
+        # Naver Clova OCR implementation
+        ...
+```
+
+> See `docs/ocr-integration.md` for detailed OCR integration history and comparison.
 
 ---
 
@@ -374,8 +444,8 @@ curl -X POST "http://127.0.0.1:8000/rizz/generate"   -H "Content-Type: applicati
 Implemented in `app/services/llm.py`:
 
 - Uses `ChatOpenAI` with models from env:
-  - `OPENAI_STANDARD_MODEL`
-  - `OPENAI_PREMIUM_MODEL`
+  - `OPENAI_STANDARD_MODEL` (Free tier)
+  - `OPENAI_PREMIUM_MODEL` (Premium tier)
 - System prompt describes a Korean dating assistant (시라노 스타일).
 - User/context prompt includes:
   - Conversation text
@@ -384,31 +454,60 @@ Implemented in `app/services/llm.py`:
 
 ---
 
+## 🖼️ OCR Integration
+
+### Naver Clova OCR (Selected)
+
+**Why Naver Clova?**
+- **Accuracy:** 95%+ on chat screenshots (vs 60-70% with PyTesseract)
+- **Cost:** 100 requests/month free, ₩1/request after
+- **Memory:** External API (0MB server memory)
+- **Speed:** ~3 seconds per request
+
+**Alternatives Tried:**
+- **EasyOCR:** 90% accuracy, but requires 2GB RAM ($48/month server)
+- **PyTesseract:** 60-70% accuracy, failed on complex chat UI
+
+**Setup:**
+1. Create Naver Cloud account
+2. Enable CLOVA OCR (General OCR, Premium)
+3. Create Domain
+4. Auto-link API Gateway
+5. Copy Secret Key + Invoke URL to `.env`
+
+**Cost Estimate:**
+- DAU 50 (500 requests/month): **Free**
+- DAU 500 (5,000 requests/month): **~$3/month**
+- Breakeven: ~30,000 requests/month (then self-hosted OCR becomes cheaper)
+
+See `docs/ocr-integration.md` for full details.
+
+---
+
 ## ✅ Current MVP Status
 
 As of now, the backend supports:
 
-- Anonymous user provisioning
-  - `POST /auth/anonymous`
-- Subscription lookup
-  - `GET /auth/me/subscription`
-- Premium upgrade (MVP implementation: simple DB switch)
-  - `POST /billing/subscribe`
-- Rizz message generation
-  - `POST /rizz/generate` (uses `user_id` + subscription status)
+- Anonymous user provisioning (`POST /auth/anonymous`)
+- Subscription lookup (`GET /auth/me/subscription`)
+- Premium upgrade - MVP implementation (`POST /billing/subscribe`)
+- **Text-based message generation** (`POST /rizz/generate`)
+- **Image-based message generation** (`POST /rizz/analyze-image`) ⭐ **NEW**
 - Database schema ready for future message history
-  - `message_history` table exists
 - CORS enabled for development
 - Dockerized Postgres with persistent volume
+- **OCR service with Protocol pattern** (easy to swap providers) ⭐ **NEW**
 
 This is sufficient for:
 
 - **Free tier**
   - Ads controlled by frontend via `is_premium=false`
   - Standard LLM model
+  - OCR-powered screenshot analysis
 - **Premium tier**
   - Ads removed (frontend responsibility)
-  - Optionally better LLM model, more suggestions, relaxed limits
+  - Premium LLM model
+  - More suggestions, relaxed limits
 
 Future work:
 
@@ -416,7 +515,23 @@ Future work:
 - Free-tier daily limits based on history/usage
 - Real payment integration and receipt validation
 - Production-grade CORS origin restrictions
-- Deployment to DigitalOcean with HTTPS (App Platform recommended for simplicity)
+- Profile-based personalization (name, age, MBTI, gender, memo)
+- OCR prompt optimization
+
+---
+
+## 🚀 Deployment
+
+**Platform:** DigitalOcean App Platform
+
+**Current Plan:** 512MB RAM, 1 vCPU ($12/month)
+
+**Configuration:**
+- Environment variables set in App-Level settings
+- Auto-deploy from `main` branch
+- HTTPS enabled by default
+
+**Database:** Managed PostgreSQL (DigitalOcean)
 
 ---
 
