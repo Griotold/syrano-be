@@ -3,24 +3,28 @@
 ## 🔴 High Priority (MVP 완성 전)
 
 ### 1. Anonymous Auth API 개선
-**문제:**
-- `POST /auth/anonymous`가 `user_id`를 입력받고 다시 리턴하는 구조가 혼란스러움
-- "익명 인증"인데 ID를 미리 알아야 함
+**상태:** ✅ 완료
 
-**개선안:**
+**변경 사항:**
+- `POST /auth/anonymous`: user_id 파라미터 제거, 항상 새 사용자 생성
+- 기존 사용자 확인: `GET /auth/me/subscription?user_id=xxx` 사용
+
+**Flutter 사용 패턴:**
+```dart
+// 앱 시작 시
+String? userId = prefs.getString('user_id');
+
+if (userId == null) {
+  // 첫 실행 → 새 유저 생성
+  final response = await http.post('/auth/anonymous');
+  userId = response['user_id'];
+  await prefs.setString('user_id', userId);
+}
+
+// 항상 최신 구독 상태 확인
+final subscription = await http.get('/auth/me/subscription?user_id=$userId');
+// subscription['is_premium']으로 UI 표시
 ```
-Option 1: user_id 입력 제거
-- 요청: {} (빈 body)
-- 응답: { "user_id": "새로생성된ID", "is_premium": false }
-- 기존 사용자 확인은 GET /auth/me/subscription으로
-
-Option 2: 분리
-- POST /auth/anonymous (새 사용자 생성)
-- POST /auth/login (기존 user_id로 로그인)
-```
-
-**우선순위:** High  
-**예상 시간:** 1시간
 
 ---
 

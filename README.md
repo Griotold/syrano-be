@@ -243,26 +243,15 @@ app.add_middleware(
 
 ### 1) `POST /auth/anonymous` – Anonymous User Provisioning
 
-Create (or reuse) an anonymous user and ensure a default subscription exists.
+Create a new anonymous user with default subscription.
 
 **Request**
-
 ```bash
 curl -X POST "http://127.0.0.1:8000/auth/anonymous" \
-  -H "Content-Type: application/json" \
-  -d '{}'
-```
-
-Optionally, an existing `user_id` can be passed:
-
-```json
-{
-  "user_id": "existing-user-id"
-}
+  -H "Content-Type: application/json"
 ```
 
 **Response**
-
 ```json
 {
   "user_id": "cdcbad1a-d960-48f3-961a-5b08ae87ad60",
@@ -270,8 +259,9 @@ Optionally, an existing `user_id` can be passed:
 }
 ```
 
-- Creates a new `User` row if `user_id` is not provided or not found.
-- Ensures a corresponding `Subscription` row exists with `is_premium=false`.
+- Always creates a **new** `User` row
+- Creates a corresponding `Subscription` row with `is_premium=false`
+- For existing users, use `GET /auth/me/subscription` instead
 
 ---
 
@@ -280,13 +270,11 @@ Optionally, an existing `user_id` can be passed:
 Retrieve the current subscription status for a given user.
 
 **Request**
-
 ```bash
 curl "http://127.0.0.1:8000/auth/me/subscription?user_id=USER_ID"
 ```
 
 **Response**
-
 ```json
 {
   "user_id": "0653a764-b671-4334-8daa-685b060f2b6e",
@@ -296,8 +284,7 @@ curl "http://127.0.0.1:8000/auth/me/subscription?user_id=USER_ID"
 }
 ```
 
-After activation, for example:
-
+After premium activation:
 ```json
 {
   "user_id": "0653a764-b671-4334-8daa-685b060f2b6e",
