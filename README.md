@@ -158,6 +158,23 @@ Expected:
 
 ---
 
+### `profiles` (User 1:N Profile) ✅ NEW
+| Column     | Type        | Description                                  |
+|-----------|-------------|----------------------------------------------|
+| id        | VARCHAR(36) | Primary key                                  |
+| user_id   | VARCHAR(36) | FK → users.id (CASCADE DELETE)               |
+| name      | VARCHAR(100)| Profile name (required)                      |
+| age       | INTEGER     | Age (optional)                               |
+| gender    | VARCHAR(10) | Gender (optional)                            |
+| memo      | TEXT        | Memo/notes (optional)                        |
+| created_at| TIMESTAMPTZ | Creation time                                |
+| updated_at| TIMESTAMPTZ | Last update time                             |
+
+> Each user can have multiple profiles (e.g., girlfriend, date, friend).
+> Profiles are used to personalize LLM prompts with context about the chat partner.
+
+---
+
 ### `message_history` (Prepared for future use)
 
 | Column       | Type        | Description                                   |
@@ -399,6 +416,134 @@ curl -X POST "http://127.0.0.1:8000/rizz/analyze-image" \
 }
 ```
 
+### 6) Profile CRUD APIs 
+
+#### a) `POST /profiles` – Create Profile
+
+Create a new profile for a user.
+
+**Request**
+```bash
+curl -X POST "http://127.0.0.1:8000/profiles" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": "user-123",
+    "name": "여자친구",
+    "age": 25,
+    "gender": "여성",
+    "memo": "영화 좋아함, 유머 센스 있음"
+  }'
+```
+
+**Response**
+```json
+{
+  "id": "profile-456",
+  "user_id": "user-123",
+  "name": "여자친구",
+  "age": 25,
+  "gender": "여성",
+  "memo": "영화 좋아함, 유머 센스 있음",
+  "created_at": "2025-12-25T...",
+  "updated_at": "2025-12-25T..."
+}
+```
+
+---
+
+#### b) `GET /profiles?user_id=xxx` – List Profiles
+
+Get all profiles for a user (sorted by newest first).
+
+**Request**
+```bash
+curl "http://127.0.0.1:8000/profiles?user_id=user-123"
+```
+
+**Response**
+```json
+{
+  "profiles": [
+    {
+      "id": "profile-456",
+      "name": "여자친구",
+      ...
+    },
+    {
+      "id": "profile-789",
+      "name": "소개팅 상대",
+      ...
+    }
+  ]
+}
+```
+
+---
+
+#### c) `GET /profiles/{profile_id}` – Get Profile
+
+Retrieve a specific profile by ID.
+
+**Request**
+```bash
+curl "http://127.0.0.1:8000/profiles/profile-456"
+```
+
+**Response**
+```json
+{
+  "id": "profile-456",
+  "user_id": "user-123",
+  "name": "여자친구",
+  ...
+}
+```
+
+---
+
+#### d) `PUT /profiles/{profile_id}` – Update Profile
+
+Update specific fields of a profile (partial update supported).
+
+**Request**
+```bash
+curl -X PUT "http://127.0.0.1:8000/profiles/profile-456" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "age": 26,
+    "memo": "영화와 음악 좋아함"
+  }'
+```
+
+**Response**
+```json
+{
+  "id": "profile-456",
+  "name": "여자친구",
+  "age": 26,
+  "memo": "영화와 음악 좋아함",
+  "updated_at": "2025-12-25T..." // ✅ auto-updated
+}
+```
+
+---
+
+#### e) `DELETE /profiles/{profile_id}` – Delete Profile
+
+Delete a profile (returns 204 No Content).
+
+**Request**
+```bash
+curl -X DELETE "http://127.0.0.1:8000/profiles/profile-456"
+```
+
+**Response**
+```
+(No content, 204 status)
+```
+
+---
+
 **Flow:**
 
 1. Save uploaded image temporarily
@@ -475,15 +620,16 @@ See `docs/ocr-integration.md` for full details.
 
 As of now, the backend supports:
 
-- Anonymous user provisioning (`POST /auth/anonymous`)
+- Anonymous user provisioning (`POST /auth/anonymous`) ✅ Simplified
 - Subscription lookup (`GET /auth/me/subscription`)
 - Premium upgrade - MVP implementation (`POST /billing/subscribe`)
 - **Text-based message generation** (`POST /rizz/generate`)
-- **Image-based message generation** (`POST /rizz/analyze-image`) ⭐ **NEW**
+- **Image-based message generation** (`POST /rizz/analyze-image`)
+- **Profile CRUD** (`/profiles` endpoints) ✅ **NEW**
 - Database schema ready for future message history
 - CORS enabled for development
 - Dockerized Postgres with persistent volume
-- **OCR service with Protocol pattern** (easy to swap providers) ⭐ **NEW**
+- **OCR service with Protocol pattern**
 
 This is sufficient for:
 
@@ -491,10 +637,20 @@ This is sufficient for:
   - Ads controlled by frontend via `is_premium=false`
   - Standard LLM model
   - OCR-powered screenshot analysis
+  - Multiple profiles per user ✅ **NEW**
 - **Premium tier**
   - Ads removed (frontend responsibility)
   - Premium LLM model
   - More suggestions, relaxed limits
+
+Future work:
+
+- **Profile-based personalization in `/rizz/analyze-image`** (TODO #2.3) 🔴 HIGH PRIORITY
+- Persist message history into `message_history` in `/rizz/generate`
+- Free-tier daily limits based on history/usage
+- Real payment integration and receipt validation
+- Production-grade CORS origin restrictions
+- OCR prompt optimization
 
 Future work:
 

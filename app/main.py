@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.db import init_db
-from app.routers import rizz, auth, billing
+from app.routers import rizz, auth, billing, profiles  # ✅ profiles 추가
 
 logger = logging.getLogger("syrano")
 logging.basicConfig(level=logging.INFO)
@@ -41,3 +41,4 @@ def health_check():
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(rizz.router, prefix="/rizz", tags=["rizz"])
 app.include_router(billing.router, prefix="/billing", tags=["billing"])
+app.include_router(profiles.router, prefix="/profiles", tags=["profiles"])  # ✅ 추가
