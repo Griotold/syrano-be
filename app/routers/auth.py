@@ -17,12 +17,6 @@ logger = logging.getLogger("syrano")
 
 router = APIRouter()
 
-
-class AnonymousAuthRequest(BaseModel):
-    user_id: Optional[str] = None
-    # 나중에 디바이스 정보 등 붙이고 싶으면 여기에 확장 가능
-
-
 class AnonymousAuthResponse(BaseModel):
     user_id: str
     is_premium: bool
@@ -36,34 +30,36 @@ class SubscriptionStatusResponse(BaseModel):
 
 @router.post("/anonymous", response_model=AnonymousAuthResponse)
 async def auth_anonymous(
-    body: AnonymousAuthRequest,
+    # ✅ body 파라미터 완전 제거
     session: AsyncSession = Depends(get_session),
 ):
     """
-    익명 유저 발급/조회용 엔드포인트.
-
-    - body.user_id가 없으면: 새 User + 기본 Subscription 생성 후 user_id 반환
-    - body.user_id가 있으면: 해당 User가 있으면 재사용, 없으면 새로 생성
+    새 익명 유저 생성 (항상 새로 생성)
+    
+    - body 없이 호출
+    - 항상 새 User + 기본 Subscription 생성
+    - 기존 사용자 확인은 GET /auth/me/subscription 사용
     """
     try:
+        # ✅ user_id=None으로 고정 (항상 새 유저 생성)
         user = await get_or_create_anonymous_user(
             session=session,
-            user_id=body.user_id,
+            user_id=None,
         )
+        
+        # ✅ 새 유저는 항상 is_premium=False
+        return AnonymousAuthResponse(
+            user_id=user.id,
+            is_premium=False,
+        )
+        
     except Exception as e:
-        logger.exception("Failed to create/get anonymous user")
+        logger.exception("Failed to create anonymous user")
         raise HTTPException(
             status_code=500,
             detail="익명 유저 생성 중 오류가 발생했어요.",
         ) from e
 
-    # Subscription에서 is_premium 상태를 확인하는 로직은
-    # 나중에 확장할 예정이지만, 지금은 기본 False로 내려도 충분함.
-    # (혹은 필요하면 Subscription 조회 쿼리를 추가해도 됨)
-    return AnonymousAuthResponse(
-        user_id=user.id,
-        is_premium=False,
-    )
 
 @router.get("/me/subscription", response_model=SubscriptionStatusResponse)
 async def get_my_subscription(
@@ -79,7 +75,6 @@ async def get_my_subscription(
     subscription = await get_subscription_by_user_id(session, user_id)
 
     if subscription is None:
-        # 유저가 없거나, 구독이 아직 생성되지 않은 경우
         raise HTTPException(
             status_code=404,
             detail="구독 정보를 찾을 수 없어요.",
