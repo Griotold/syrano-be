@@ -13,6 +13,7 @@ from app.db import get_session
 from app.services.llm import generate_suggestions_from_conversation
 from app.services.subscriptions import get_subscription_by_user_id
 from app.services.ocr.naver import NaverOCRService
+from app.services.profiles import get_profile_by_id
 from app.config import NAVER_OCR_SECRET_KEY, NAVER_OCR_INVOKE_URL   
 from app.schemas.rizz import GenerateRequest, GenerateResponse
 
@@ -84,20 +85,18 @@ async def generate_rizz(
 async def analyze_image(
     image: UploadFile = File(...),
     user_id: str = Form(...),
-    platform: str = Form("kakao"),
-    relationship: str = Form("first_meet"),
-    style: str = Form("banmal"),
-    tone: str = Form("friendly"),
+    profile_id: str = Form(...),          
     num_suggestions: int = Form(3),
     session: AsyncSession = Depends(get_session),
 ):
     """
     이미지 기반 Rizz 메시지 생성 엔드포인트.
     
-    1. 이미지를 임시 저장
-    2. Naver Clova OCR로 텍스트 추출
-    3. LLM으로 답변 생성
-    4. 임시 파일 삭제
+    1. Profile 조회
+    2. 이미지를 임시 저장
+    3. Naver Clova OCR로 텍스트 추출
+    4. Profile 정보 + OCR 텍스트를 LLM에 전달
+    5. 임시 파일 삭제
     """
     
     # 1) 구독 확인
@@ -110,11 +109,26 @@ async def analyze_image(
     
     is_premium = subscription.is_premium
     
-    # 2) 임시 디렉토리 생성
+    # 2) Profile 조회
+    profile = await get_profile_by_id(session, profile_id)
+    if profile is None:
+        raise HTTPException(
+            status_code=404,
+            detail="해당 프로필을 찾을 수 없어요.",
+        )
+    
+    # Profile이 해당 user의 것인지 검증
+    if profile.user_id != user_id:
+        raise HTTPException(
+            status_code=403,
+            detail="다른 사용자의 프로필은 사용할 수 없어요.",
+        )
+    
+    # 3) 임시 디렉토리 생성
     temp_dir = Path("temp_images")
     temp_dir.mkdir(exist_ok=True)
     
-    # 3) 임시 파일 저장
+    # 4) 임시 파일 저장
     file_id = str(uuid.uuid4())
     file_extension = Path(image.filename or "image.jpg").suffix or ".jpg"
     file_path = temp_dir / f"{file_id}{file_extension}"
@@ -127,7 +141,7 @@ async def analyze_image(
         
         logger.info(f"Image saved to {file_path}, size: {len(content)} bytes")
         
-        # 4) OCR 실행
+        # 5) OCR 실행
         ocr_service = NaverOCRService(
             secret_key=NAVER_OCR_SECRET_KEY,
             invoke_url=NAVER_OCR_INVOKE_URL
@@ -144,13 +158,10 @@ async def analyze_image(
                 detail="이미지에서 텍스트를 추출하지 못했어요. 더 선명한 이미지를 사용해주세요.",
             )
         
-        # 5) LLM 답변 생성
+        # 6) LLM 답변 생성
         suggestions = await generate_suggestions_from_conversation(
             conversation=conversation,
-            platform=platform,
-            relationship=relationship,
-            style=style,
-            tone=tone,
+            profile=profile,
             num_suggestions=num_suggestions,
             is_premium=is_premium,
         )
@@ -172,7 +183,7 @@ async def analyze_image(
             detail=f"이미지 분석 중 오류가 발생했어요: {str(e)}",
         ) from e
     finally:
-        # 6) 임시 파일 삭제
+        # 7) 임시 파일 삭제
         try:
             if file_path.exists():
                 file_path.unlink()

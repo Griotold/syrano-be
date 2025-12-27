@@ -5,117 +5,80 @@
 ### 1. Anonymous Auth API 개선
 **상태:** ✅ **완료**
 
-**변경 사항:**
-- `POST /auth/anonymous`: user_id 파라미터 제거, 항상 새 사용자 생성
-- 기존 사용자 확인: `GET /auth/me/subscription?user_id=xxx` 사용
-
 ---
 
 ### 2. Profile CRUD API 구현
 **상태:** ✅ **완료**
 
-**구현 내용:**
-
 #### 2.1 Profile 테이블 ✅
-- User 1:N Profile 관계
-- 필드: name, age, gender, memo
-- MBTI 제외 (범용성 고려)
-
 #### 2.2 API 엔드포인트 ✅
-```
-POST   /profiles              - 프로필 생성
-GET    /profiles?user_id=xxx  - 사용자의 프로필 목록
-GET    /profiles/{profile_id} - 특정 프로필 조회
-PUT    /profiles/{profile_id} - 프로필 수정
-DELETE /profiles/{profile_id} - 프로필 삭제
-```
+#### 2.3 analyze-image API 개선 ✅ **완료**
 
-#### 2.3 analyze-image API 개선 🔴 **다음 작업**
-```python
-# 기존
-POST /rizz/analyze-image
-{
-  "image": file,
-  "user_id": "...",
-  "platform": "kakao",      # 제거 예정
-  "relationship": "...",     # 제거 예정
-  "style": "banmal",         # 제거 예정
-  "tone": "friendly",        # 제거 예정
-  "num_suggestions": 3
-}
+**완료 내용:**
+- `profile_id` 기반으로 프로필 정보 조회
+- Profile 정보를 LLM 프롬프트에 반영
+- 프롬프트 분리 (`app/prompts/rizz.py`)
+- 대화 이어가기 개선 (질문/화제 제시 포함)
 
-# 개선 예정
-POST /rizz/analyze-image
-{
-  "image": file,
-  "user_id": "...",
-  "profile_id": "...",       # 추가
-  "num_suggestions": 3
-}
+---
 
-# 백엔드에서 profile_id로 프로필 조회 후 프롬프트에 활용
-```
+### 3. 프롬프트 최적화 ✅ **완료**
 
-**우선순위:** High  
-**예상 시간:** 2시간
+**완료 내용:**
+- 프롬프트 분리: `app/prompts/rizz.py`
+- Profile 정보 활용 (이름, 나이, 성별, 메모)
+- 한국어/영어 자동 감지
+- 대화 연속성 개선 (질문/화제 포함)
+- 말투 유연성 개선 (로맨틱, 장난스러운 표현 허용)
 
 ---
 
 ## 🟡 Medium Priority (MVP 이후)
 
-### 3. OCR 프롬프트 최적화
-**현재:**
-- OCR 추출 텍스트를 그대로 LLM에 전달
-- 프로필 정보 미활용
+### 4. Message History 저장
+**상태:** ⏸️ 대기
 
-**개선:**
-```python
-user_prompt = f"""
-상대방 정보:
-- 이름: {profile.name}
-- 나이: {profile.age}세
-- 성별: {profile.gender}
-- 메모: {profile.memo}
+**내용:**
+- `/rizz/analyze-image` 결과를 `message_history` 테이블에 저장
+- 사용량 추적
+- 무료 사용자 일일 제한 기반 마련
 
-채팅 대화 내용 (OCR 추출, 오타 가능):
-{conversation}
-
-위 맥락을 고려하여:
-1. 상대방의 말투 분석 (존댓말/반말)
-2. 대화 분위기 파악
-3. 자연스러운 답장 {num_suggestions}개 추천
-"""
-```
-
-**우선순위:** Medium  
 **예상 시간:** 2시간
 
 ---
 
-### 4. Message History 저장
-...
-
 ### 5. 무료 사용자 일일 제한
-...
+**상태:** ⏸️ 대기
+
+**내용:**
+- Message History 기반으로 일일 사용량 체크
+- 무료: 5회/일
+- 프리미엄: 무제한
+
+**예상 시간:** 2시간
 
 ---
 
 ## 🟢 Low Priority (나중에)
 
 ### 6. 실제 결제 연동
-...
+- App Store / Google Play 영수증 검증
+- Subscription 만료 체크 자동화
 
 ### 7. OCR 이미지 전처리
-...
+- 저화질 이미지 개선
+- 텍스트 영역 자동 크롭
 
-### 8. 에러 핸들링 개선
-...
+### 8. 프롬프트 A/B 테스트
+- 다양한 프롬프트 버전 테스트
+- 사용자 피드백 수집
 
 ### 9. CORS 프로덕션 설정
-...
+- `allow_origins` 실제 도메인으로 제한
 
 ### 10. 로깅 개선
-...
+- 구조화된 로깅
+- 에러 추적 강화
 
 ---
 
@@ -123,13 +86,13 @@ user_prompt = f"""
 
 - [x] Anonymous Auth API 개선 ✅
 - [x] Profile CRUD 구현 ✅
-- [ ] Profile 기반 analyze-image 개선 🔴 **다음 작업**
-- [ ] Profile 기반 OCR 프롬프트
-- [ ] Message History 저장
-- [ ] 무료 사용자 일일 제한
+- [x] Profile 기반 analyze-image 개선 ✅
+- [x] 프롬프트 분리 및 최적화 ✅
+- [ ] Message History 저장 ⏸️
+- [ ] 무료 사용자 일일 제한 ⏸️
 - [ ] 실제 결제 연동
 - [ ] OCR 이미지 전처리
-- [ ] 에러 핸들링 개선
+- [ ] 프롬프트 A/B 테스트
 - [ ] CORS 프로덕션 설정
 - [ ] 로깅 개선
 
@@ -137,10 +100,12 @@ user_prompt = f"""
 
 ## 🎯 Next Sprint (우선 작업)
 
-1. ✅ ~~OCR 통합~~ (완료)
-2. ✅ ~~Anonymous Auth 개선~~ (완료)
-3. ✅ ~~Profile CRUD~~ (완료)
-4. 🔴 **Profile 기반 analyze-image 개선** (2시간)
-5. 🟡 Message History (2시간)
+1. ✅ ~~OCR 통합~~
+2. ✅ ~~Anonymous Auth 개선~~
+3. ✅ ~~Profile CRUD~~
+4. ✅ ~~Profile 기반 analyze-image~~
+5. ✅ ~~프롬프트 분리 및 최적화~~
+6. ⏸️ Message History 저장 (2시간)
+7. ⏸️ 무료 사용자 일일 제한 (2시간)
 
-**총 예상 시간:** 4시간
+**MVP 핵심 기능 완료! 🎉**

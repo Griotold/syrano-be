@@ -32,28 +32,37 @@ syrano/
       base.py                # Base + common helpers
       user.py                # User entity
       subscription.py        # Subscription entity (User 1:1)
+      profile.py             # Profile entity (User 1:N) ✅ NEW
       message_history.py     # MessageHistory entity (table ready, not used in MVP)
     routers/
       auth.py                # /auth endpoints (anonymous, subscription status)
       billing.py             # /billing endpoints (premium activation)
+      profiles.py            # /profiles endpoints (CRUD) ✅ NEW
       rizz.py                # /rizz endpoints (text & image-based message generation)
     services/
       llm.py                 # LangChain + OpenAI LLM handler
       users.py               # User-related helpers
       subscriptions.py       # Subscription-related helpers
+      profiles.py            # Profile-related helpers ✅ NEW
       ocr/                   # OCR service (Protocol pattern)
         __init__.py          # Empty
         base.py              # OCRService Protocol
         naver.py             # NaverOCRService implementation
+    prompts/                 # Prompt templates ✅ NEW
+      __init__.py
+      rizz.py                # Rizz prompt builders (system & user prompts)
     schemas/
-      rizz.py                # Request/Response DTOs
+      rizz.py                # Rizz Request/Response DTOs
+      profile.py             # Profile Request/Response DTOs ✅ NEW
   docs/
     ocr-integration.md       # OCR 통합 과정 문서
+  temp_images/               # Temporary image storage (gitignored) ✅ NEW
   .env                       # Environment variables (ignored by Git)
   pyproject.toml             # PDM configuration
   Dockerfile                 # Docker build configuration
   .gitignore
   README.md
+  TODO.md
 ```
 
 ---
@@ -387,31 +396,32 @@ curl -X POST "http://127.0.0.1:8000/rizz/generate" \
 
 ---
 
-### 5) `POST /rizz/analyze-image` – Image-Based Message Generation (NEW)
+### 5) `POST /rizz/analyze-image` – Image-Based Message Generation (Profile-based) ✅ Updated
 
-Generate reply suggestions by extracting text from a chat screenshot using **Naver Clova OCR**.
+Generate reply suggestions by extracting text from a chat screenshot using **Naver Clova OCR** and applying **Profile information** for personalized responses.
 
 **Request (multipart/form-data)**
-
 ```bash
 curl -X POST "http://127.0.0.1:8000/rizz/analyze-image" \
   -F "image=@screenshot.png" \
-  -F "user_id=cdcbad1a-d960-48f3-961a-5b08ae87ad60" \
-  -F "platform=kakao" \
-  -F "relationship=first_meet" \
-  -F "style=banmal" \
-  -F "tone=friendly" \
+  -F "user_id=c65116c4-7703-434e-a859-320961b6320b" \
+  -F "profile_id=c148fba1-7da1-43f0-a334-51be9c96ccef" \
   -F "num_suggestions=3"
 ```
 
-**Response**
+**Parameters:**
+- `image`: Chat screenshot (required)
+- `user_id`: User ID (required)
+- `profile_id`: Chat partner's profile ID (required) ✅ **NEW**
+- `num_suggestions`: Number of suggestions (default: 3, range: 1-5)
 
+**Response**
 ```json
 {
   "suggestions": [
-    "나도 이제 좀 쉬려고 해, 오늘 하루 어땠어?",
-    "저녁 맛있게 먹었어? 난 간단히 먹었어ㅎㅎ",
-    "프리한 시간 진짜 좋지, 뭐하고 놀아?"
+    "집에 오니 편안하죠? 요즘 서울에서 가장 가보고 싶은 곳 있어요?",
+    "프리한 시간 보내고 있다니 부럽네요! 주로 어떤 취미로 시간을 보내세요?",
+    "저녁 먹고 집에 오면 하루가 마무리된 느낌인데, 밍밍님은 하루 중 가장 좋아하는 시간이 언제인가요?"
   ]
 }
 ```
@@ -624,7 +634,7 @@ As of now, the backend supports:
 - Subscription lookup (`GET /auth/me/subscription`)
 - Premium upgrade - MVP implementation (`POST /billing/subscribe`)
 - **Text-based message generation** (`POST /rizz/generate`)
-- **Image-based message generation** (`POST /rizz/analyze-image`)
+- **Image-based message generation with Profile** (`POST /rizz/analyze-image`) ✅ **Updated**
 - **Profile CRUD** (`/profiles` endpoints) ✅ **NEW**
 - Database schema ready for future message history
 - CORS enabled for development
@@ -645,21 +655,12 @@ This is sufficient for:
 
 Future work:
 
-- **Profile-based personalization in `/rizz/analyze-image`** (TODO #2.3) 🔴 HIGH PRIORITY
+- ~~**Profile-based personalization in `/rizz/analyze-image`**~~ ✅ **Completed**
 - Persist message history into `message_history` in `/rizz/generate`
 - Free-tier daily limits based on history/usage
 - Real payment integration and receipt validation
 - Production-grade CORS origin restrictions
-- OCR prompt optimization
-
-Future work:
-
-- Persist message history into `message_history` in `/rizz/generate`
-- Free-tier daily limits based on history/usage
-- Real payment integration and receipt validation
-- Production-grade CORS origin restrictions
-- Profile-based personalization (name, age, MBTI, gender, memo)
-- OCR prompt optimization
+- Prompt A/B testing and optimization
 
 ---
 
