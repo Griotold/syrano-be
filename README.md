@@ -63,6 +63,7 @@ syrano/
   .gitignore
   README.md
   TODO.md
+  DATABASE.md                # Database schema documentation ✅ NEW
 ```
 
 ---
@@ -422,8 +423,19 @@ curl -X POST "http://127.0.0.1:8000/rizz/analyze-image" \
     "집에 오니 편안하죠? 요즘 서울에서 가장 가보고 싶은 곳 있어요?",
     "프리한 시간 보내고 있다니 부럽네요! 주로 어떤 취미로 시간을 보내세요?",
     "저녁 먹고 집에 오면 하루가 마무리된 느낌인데, 밍밍님은 하루 중 가장 좋아하는 시간이 언제인가요?"
-  ]
+  ],
+  "usage_info": {
+    "remaining": 4,
+    "limit": 5,
+    "is_premium": false
+  }
 }
+```
+
+**Usage Info:**
+- `remaining`: 오늘 남은 사용 횟수 (-1: 무제한)
+- `limit`: 일일 제한 횟수 (-1: 무제한)
+- `is_premium`: 프리미엄 여부
 ```
 
 ### 6) Profile CRUD APIs 
@@ -633,9 +645,12 @@ As of now, the backend supports:
 - Anonymous user provisioning (`POST /auth/anonymous`) ✅ Simplified
 - Subscription lookup (`GET /auth/me/subscription`)
 - Premium upgrade - MVP implementation (`POST /billing/subscribe`)
+- **Daily usage limit** (5/day free, unlimited premium) ✅ **NEW**
 - **Text-based message generation** (`POST /rizz/generate`)
-- **Image-based message generation with Profile** (`POST /rizz/analyze-image`) ✅ **Updated**
-- **Profile CRUD** (`/profiles` endpoints) ✅ **NEW**
+- **Image-based message generation with Profile** (`POST /rizz/analyze-image`)
+- **Profile CRUD** (`/profiles` endpoints)
+- **Prompt separation** (`app/prompts/rizz.py`)
+- **Usage info in response** (remaining, limit, is_premium) ✅ **NEW**
 - Database schema ready for future message history
 - CORS enabled for development
 - Dockerized Postgres with persistent volume
@@ -644,14 +659,17 @@ As of now, the backend supports:
 This is sufficient for:
 
 - **Free tier**
+  - 5 requests/day with usage tracking ✅ **NEW**
   - Ads controlled by frontend via `is_premium=false`
-  - Standard LLM model
+  - Standard LLM model (gpt-4o-mini)
   - OCR-powered screenshot analysis
-  - Multiple profiles per user ✅ **NEW**
+  - Multiple profiles per user
+  - Usage info returned in every response
 - **Premium tier**
+  - Unlimited requests (`remaining: -1`) ✅ **NEW**
   - Ads removed (frontend responsibility)
-  - Premium LLM model
-  - More suggestions, relaxed limits
+  - Premium LLM model (gpt-4o)
+  - All free tier features
 
 Future work:
 

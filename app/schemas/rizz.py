@@ -27,6 +27,13 @@ class ImageAnalyzeRequest(BaseModel):
 
 # ========== Response DTOs ==========
 
+class UsageInfo(BaseModel):
+    """사용량 정보"""
+    remaining: int = Field(..., description="남은 사용 횟수 (-1: 무제한)")
+    limit: int = Field(..., description="일일 제한 횟수 (-1: 무제한)")
+    is_premium: bool = Field(..., description="프리미엄 여부")
+
 class GenerateResponse(BaseModel):
     """답변 생성 응답"""
     suggestions: List[str]
+    usage_info: UsageInfo

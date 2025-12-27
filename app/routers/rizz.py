@@ -11,7 +11,10 @@ import aiofiles
 
 from app.db import get_session
 from app.services.llm import generate_suggestions_from_conversation
-from app.services.subscriptions import get_subscription_by_user_id
+from app.services.subscriptions import (
+    get_subscription_by_user_id,
+    check_and_increment_usage, 
+)
 from app.services.ocr.naver import NaverOCRService
 from app.services.profiles import get_profile_by_id
 from app.config import NAVER_OCR_SECRET_KEY, NAVER_OCR_INVOKE_URL   
@@ -20,7 +23,6 @@ from app.schemas.rizz import GenerateRequest, GenerateResponse
 logger = logging.getLogger("syrano")
 router = APIRouter()
 
-
 @router.post("/generate", response_model=GenerateResponse)
 async def generate_rizz(
     req: GenerateRequest,
@@ -28,17 +30,13 @@ async def generate_rizz(
 ):
     """
     Rizz 메시지 생성 엔드포인트 (텍스트 입력).
-    - user_id를 기반으로 DB에서 구독 상태를 조회해서 is_premium을 결정한다.
     """
-
-    # 1) user_id로 구독 조회
+    
+    # 1) 사용량 체크 및 증가
+    usage_info = await check_and_increment_usage(session, req.user_id)  # ✅ 받기
+    
+    # 2) is_premium 조회
     subscription = await get_subscription_by_user_id(session, req.user_id)
-    if subscription is None:
-        raise HTTPException(
-            status_code=404,
-            detail="해당 user_id의 구독 정보를 찾을 수 없어요. 다시 로그인(익명 인증)해 주세요.",
-        )
-
     is_premium = subscription.is_premium
 
     logger.info(
@@ -78,8 +76,10 @@ async def generate_rizz(
             detail="메시지를 생성하지 못했어요. 다시 한 번 시도해볼래요?",
         )
 
-    return GenerateResponse(suggestions=suggestions)
-
+    return GenerateResponse(
+        suggestions=suggestions,
+        usage_info=usage_info,  # ✅ 추가
+    )
 
 @router.post("/analyze-image", response_model=GenerateResponse)
 async def analyze_image(
@@ -92,24 +92,22 @@ async def analyze_image(
     """
     이미지 기반 Rizz 메시지 생성 엔드포인트.
     
-    1. Profile 조회
-    2. 이미지를 임시 저장
-    3. Naver Clova OCR로 텍스트 추출
-    4. Profile 정보 + OCR 텍스트를 LLM에 전달
-    5. 임시 파일 삭제
+    1. 사용량 체크 및 증가
+    2. Profile 조회
+    3. 이미지를 임시 저장
+    4. Naver Clova OCR로 텍스트 추출
+    5. Profile 정보 + OCR 텍스트를 LLM에 전달
+    6. 임시 파일 삭제
     """
     
-    # 1) 구독 확인
-    subscription = await get_subscription_by_user_id(session, user_id)
-    if subscription is None:
-        raise HTTPException(
-            status_code=404,
-            detail="해당 user_id의 구독 정보를 찾을 수 없어요. 다시 로그인(익명 인증)해 주세요.",
-        )
+    # 1) 사용량 체크 및 증가
+    usage_info = await check_and_increment_usage(session, user_id)  # ✅ 받기
     
+    # 2) is_premium 조회 (LLM 모델 선택용)
+    subscription = await get_subscription_by_user_id(session, user_id)
     is_premium = subscription.is_premium
     
-    # 2) Profile 조회
+    # 3) Profile 조회
     profile = await get_profile_by_id(session, profile_id)
     if profile is None:
         raise HTTPException(
@@ -124,11 +122,11 @@ async def analyze_image(
             detail="다른 사용자의 프로필은 사용할 수 없어요.",
         )
     
-    # 3) 임시 디렉토리 생성
+    # 4) 임시 디렉토리 생성
     temp_dir = Path("temp_images")
     temp_dir.mkdir(exist_ok=True)
     
-    # 4) 임시 파일 저장
+    # 5) 임시 파일 저장
     file_id = str(uuid.uuid4())
     file_extension = Path(image.filename or "image.jpg").suffix or ".jpg"
     file_path = temp_dir / f"{file_id}{file_extension}"
@@ -141,7 +139,7 @@ async def analyze_image(
         
         logger.info(f"Image saved to {file_path}, size: {len(content)} bytes")
         
-        # 5) OCR 실행
+        # 6) OCR 실행
         ocr_service = NaverOCRService(
             secret_key=NAVER_OCR_SECRET_KEY,
             invoke_url=NAVER_OCR_INVOKE_URL
@@ -158,7 +156,7 @@ async def analyze_image(
                 detail="이미지에서 텍스트를 추출하지 못했어요. 더 선명한 이미지를 사용해주세요.",
             )
         
-        # 6) LLM 답변 생성
+        # 7) LLM 답변 생성
         suggestions = await generate_suggestions_from_conversation(
             conversation=conversation,
             profile=profile,
@@ -172,7 +170,10 @@ async def analyze_image(
                 detail="메시지를 생성하지 못했어요. 다시 한 번 시도해볼래요?",
             )
         
-        return GenerateResponse(suggestions=suggestions)
+        return GenerateResponse(
+            suggestions=suggestions,
+            usage_info=usage_info,  # ✅ 추가
+        )
         
     except HTTPException:
         raise
@@ -183,7 +184,7 @@ async def analyze_image(
             detail=f"이미지 분석 중 오류가 발생했어요: {str(e)}",
         ) from e
     finally:
-        # 7) 임시 파일 삭제
+        # 8) 임시 파일 삭제
         try:
             if file_path.exists():
                 file_path.unlink()
