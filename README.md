@@ -359,7 +359,54 @@ After this, `GET /auth/me/subscription` will reflect the updated premium status.
 
 ---
 
-### 4) `POST /rizz/generate` – Text-Based Message Generation
+### 4) `GET /billing/usage` – 사용량 조회 ✅ NEW
+
+현재 사용자의 오늘 사용량 조회.
+
+**Request**
+```bash
+curl "http://127.0.0.1:8000/billing/usage?user_id=USER_ID"
+```
+
+**Response (무료 사용자 - 0회 사용)**
+```json
+{
+  "is_premium": false,
+  "remaining_count": 5,
+  "daily_limit": 5,
+  "used_count": 0
+}
+```
+
+**Response (무료 사용자 - 5회 모두 사용)**
+```json
+{
+  "is_premium": false,
+  "remaining_count": 0,
+  "daily_limit": 5,
+  "used_count": 5
+}
+```
+
+**Response (프리미엄 사용자)**
+```json
+{
+  "is_premium": true,
+  "remaining_count": null,
+  "daily_limit": null,
+  "used_count": 0
+}
+```
+
+**기능:**
+- 프리미엄/무료 분기 처리
+- 날짜 변경 시 자동 리셋 (`daily_usage_count` → 0)
+- 만료된 프리미엄 자동 무료 전환
+- 프리미엄: `remaining_count=null`, `daily_limit=null` (무제한)
+
+---
+
+### 5) `POST /rizz/generate` – Text-Based Message Generation
 
 Generate attractive, context-aware reply suggestions based on conversation text.
 
@@ -397,7 +444,7 @@ curl -X POST "http://127.0.0.1:8000/rizz/generate" \
 
 ---
 
-### 5) `POST /rizz/analyze-image` – Image-Based Message Generation (Profile-based) ✅ Updated
+### 6) `POST /rizz/analyze-image` – Image-Based Message Generation (Profile-based) ✅ Updated
 
 Generate reply suggestions by extracting text from a chat screenshot using **Naver Clova OCR** and applying **Profile information** for personalized responses.
 
@@ -438,7 +485,7 @@ curl -X POST "http://127.0.0.1:8000/rizz/analyze-image" \
 - `is_premium`: 프리미엄 여부
 ```
 
-### 6) Profile CRUD APIs 
+### 7) Profile CRUD APIs 
 
 #### a) `POST /profiles` – Create Profile
 

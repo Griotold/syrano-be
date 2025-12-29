@@ -30,6 +30,7 @@
 - 한국어/영어 자동 감지
 - 대화 연속성 개선 (질문/화제 포함)
 - 말투 유연성 개선 (로맨틱, 장난스러운 표현 허용)
+- Few-shot 예시 추가 (한국어 메신저 스타일)
 
 ---
 
@@ -52,7 +53,33 @@
 
 ---
 
-### 5. 만료된 구독 자동 처리 ✅ **완료**
+### 5. 사용량 조회 API 구현 ✅ **완료**
+
+**완료 일자:** 2025-12-29
+
+**완료 내용:**
+- `GET /billing/usage` 엔드포인트 추가
+- 프리미엄/무료 분기 처리
+- 날짜 자동 리셋 (`last_reset_date` 체크)
+- 만료된 구독 자동 처리 (`check_and_update_subscription_status`)
+- 응답: `is_premium`, `remaining_count`, `daily_limit`, `used_count`
+
+**구현 위치:**
+- `app/routers/billing.py`
+- `UsageResponse` 모델 추가
+
+**동작:**
+- 무료: `remaining_count=0~5`, `daily_limit=5`
+- 프리미엄: `remaining_count=null`, `daily_limit=null` (무제한)
+- 날짜 변경 시: `daily_usage_count` 자동 0으로 리셋
+
+**플러터 연동:**
+- HomeScreen, ImageSelectionScreen, ResponseScreen에서 사용량 표시
+- UsageBadge 클릭 시 안내 다이얼로그
+
+---
+
+### 6. 만료된 구독 자동 처리 ✅ **완료**
 
 **완료 내용:**
 - `check_and_update_subscription_status` 함수 구현
@@ -77,7 +104,7 @@
 
 ## 🟡 Medium Priority (MVP 이후)
 
-### 6. 로깅 개선 및 보안 강화
+### 7. 로깅 개선 및 보안 강화
 **상태:** ⏸️ 대기
 
 **현재 문제:**
@@ -106,7 +133,7 @@
 
 ---
 
-### 7. 프롬프트 A/B 테스트
+### 8. 프롬프트 A/B 테스트
 **상태:** ⏸️ 대기
 
 **내용:**
@@ -120,7 +147,7 @@
 
 ## 🟢 Low Priority (나중에)
 
-### 8. Message History 본격 활용 (필요시)
+### 9. Message History 본격 활용 (필요시)
 **상태:** ⏸️ 보류
 
 **현재 판단:**
@@ -139,7 +166,7 @@
 
 ---
 
-### 9. 실제 결제 연동
+### 10. 실제 결제 연동
 **내용:**
 - App Store / Google Play 영수증 검증
 - Subscription 만료 체크 자동화
@@ -147,7 +174,7 @@
 
 ---
 
-### 10. OCR 이미지 전처리
+### 11. OCR 이미지 전처리
 **내용:**
 - 저화질 이미지 개선
 - 텍스트 영역 자동 크롭
@@ -155,14 +182,14 @@
 
 ---
 
-### 11. CORS 프로덕션 설정
+### 12. CORS 프로덕션 설정
 **내용:**
 - `allow_origins` 실제 도메인으로 제한
 - 프로덕션 환경변수 분리
 
 ---
 
-### 12. 구조화된 로깅
+### 13. 구조화된 로깅
 **내용:**
 - JSON 형식 로깅
 - 에러 추적 강화
@@ -177,7 +204,9 @@
 - [x] Profile CRUD 구현
 - [x] Profile 기반 analyze-image 개선
 - [x] 프롬프트 분리 및 최적화
+- [x] 프롬프트 Few-shot 예시 추가
 - [x] 사용량 제한 구현 (5/day free, unlimited premium)
+- [x] 사용량 조회 API 구현 (GET /billing/usage)
 - [x] 만료된 구독 자동 처리
 
 ### 다음 단계 (우선순위순)
@@ -200,8 +229,29 @@
 3. ✅ ~~Profile CRUD~~
 4. ✅ ~~Profile 기반 analyze-image~~
 5. ✅ ~~프롬프트 분리 및 최적화~~
-6. ✅ ~~사용량 제한 구현~~
-7. ✅ ~~만료된 구독 자동 처리~~
-8. ✅ ~~DO 프로덕션 DB 마이그레이션~~
+6. ✅ ~~프롬프트 Few-shot 예시 추가~~
+7. ✅ ~~사용량 제한 구현~~
+8. ✅ ~~사용량 조회 API 구현~~
+9. ✅ ~~만료된 구독 자동 처리~~
+10. ✅ ~~DO 프로덕션 DB 마이그레이션~~
 
-**백엔드 MVP 완성! 프론트엔드 개발 시작 가능! 🚀**
+**백엔드 MVP Phase 3 완성! 프론트엔드 연동 완료! 🚀**
+
+---
+
+## 📝 Phase 3 완료 요약 (2025-12-29)
+
+**백엔드 완료:**
+- ✅ GET /billing/usage 엔드포인트 추가
+- ✅ UsageResponse 모델 구현
+- ✅ 프리미엄/무료 분기 처리
+- ✅ 날짜 자동 리셋 기능
+- ✅ 만료된 프리미엄 자동 무료 전환
+
+**플러터 연동:**
+- ✅ UsageBadge 위젯 (3개 화면)
+- ✅ 사용량 안내 다이얼로그
+- ✅ 프리미엄 전환 유도
+
+**다음 단계:**
+- Phase 4: 구독 화면 구현
