@@ -1,8 +1,7 @@
-# app/routers/billing.py
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, date
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -13,6 +12,7 @@ from app.db import get_session
 from app.services.subscriptions import (
     activate_subscription,
     get_subscription_by_user_id,
+    check_and_update_subscription_status,  # ✅ 추가
 )
 
 logger = logging.getLogger("syrano")
@@ -29,6 +29,14 @@ class SubscriptionStatusResponse(BaseModel):
     is_premium: bool
     plan_type: str | None = None
     expires_at: datetime | None = None
+
+
+class UsageResponse(BaseModel):  # ✅ 추가
+    """사용량 조회 응답"""
+    is_premium: bool
+    remaining_count: int | None  # None: 무제한
+    daily_limit: int | None      # None: 무제한
+    used_count: int              # 오늘 사용한 횟수
 
 
 @router.post("/subscribe", response_model=SubscriptionStatusResponse)
@@ -60,4 +68,58 @@ async def subscribe(
         is_premium=subscription.is_premium,
         plan_type=subscription.plan_type,
         expires_at=subscription.expires_at,
+    )
+
+
+@router.get("/usage", response_model=UsageResponse)  # ✅ 추가
+async def get_usage(
+    user_id: str,
+    session: AsyncSession = Depends(get_session),
+):
+    """
+    사용자의 현재 사용량 조회
+    
+    - 프리미엄: remaining_count=None, daily_limit=None (무제한)
+    - 무료: remaining_count=0~5, daily_limit=5
+    - 날짜 변경 시 자동 리셋
+    - 만료된 프리미엄은 자동으로 무료 전환
+    """
+    # 1. Subscription 조회
+    subscription = await get_subscription_by_user_id(session, user_id)
+    if subscription is None:
+        raise HTTPException(
+            status_code=404,
+            detail="구독 정보를 찾을 수 없어요.",
+        )
+    
+    # 2. 만료 체크 및 자동 처리
+    await check_and_update_subscription_status(session, subscription)
+    
+    # 3. 날짜 체크 및 리셋
+    today = date.today()
+    if subscription.last_reset_date != today:
+        subscription.daily_usage_count = 0
+        subscription.last_reset_date = today
+        await session.commit()
+        await session.refresh(subscription)
+    
+    # 4. 프리미엄 분기
+    if subscription.is_premium:
+        return UsageResponse(
+            is_premium=True,
+            remaining_count=None,  # 무제한
+            daily_limit=None,      # 무제한
+            used_count=0,          # 카운트 안 함
+        )
+    
+    # 5. 무료 사용자
+    daily_limit = 5
+    used_count = subscription.daily_usage_count
+    remaining_count = max(0, daily_limit - used_count)
+    
+    return UsageResponse(
+        is_premium=False,
+        remaining_count=remaining_count,
+        daily_limit=daily_limit,
+        used_count=used_count,
     )
