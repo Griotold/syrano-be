@@ -22,6 +22,8 @@ router = APIRouter()
 class SubscribeRequest(BaseModel):
     user_id: str
     plan_type: Literal["weekly", "monthly"]
+    transaction_id: str | None = None  # ← 추가 (선택)
+    platform: str | None = None  # ← 추가 (선택)
 
 
 class SubscriptionStatusResponse(BaseModel):
@@ -53,6 +55,8 @@ async def subscribe(
             session=session,
             user_id=body.user_id,
             plan_type=body.plan_type,
+            transaction_id=body.transaction_id,  # ← 추가
+            platform=body.platform,  # ← 추가
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e

@@ -36,6 +36,22 @@ class Subscription(Base):
     plan_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+    # 영수증 정보 (Apple/Google IAP)
+    transaction_id: Mapped[str | None] = mapped_column(
+        String(255), 
+        nullable=True,
+        index=True,  # 영수증 검색용
+    )
+    platform: Mapped[str | None] = mapped_column(
+        String(10),  # 'ios' or 'android'
+        nullable=True,
+    )
+    original_transaction_id: Mapped[str | None] = mapped_column(
+        String(255), 
+        nullable=True,
+        index=True,  # 자동 갱신 추적용
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=datetime.utcnow,

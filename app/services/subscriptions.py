@@ -24,6 +24,8 @@ async def activate_subscription(
     session: AsyncSession,
     user_id: str,
     plan_type: str,
+    transaction_id: str | None = None,  # ← 추가
+    platform: str | None = None,  # ← 추가
 ) -> Subscription:
     """
     주어진 user_id에 대해 프리미엄 구독을 활성화한다.
@@ -54,6 +56,8 @@ async def activate_subscription(
     subscription.is_premium = True
     subscription.plan_type = plan_type
     subscription.expires_at = expires_at
+    subscription.transaction_id = transaction_id  # ← 추가
+    subscription.platform = platform  # ← 추가
 
     await session.commit()
     await session.refresh(subscription)
