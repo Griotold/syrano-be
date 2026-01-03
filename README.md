@@ -139,66 +139,7 @@ Expected:
  public | message_history | table | syrano
 ```
 
----
 
-## 🗄️ Database Schema
-
-### `users`
-
-| Column     | Type        | Description        |
-|-----------|-------------|--------------------|
-| id        | VARCHAR(36) | Primary key (UUID) |
-| created_at| TIMESTAMPTZ | Creation time      |
-
----
-
-### `subscriptions` (User 1:1 Subscription)
-
-| Column     | Type        | Description                                  |
-|-----------|-------------|----------------------------------------------|
-| id        | VARCHAR(36) | Primary key                                  |
-| user_id   | VARCHAR(36) | FK → users.id, UNIQUE (enforces 1:1)         |
-| is_premium| BOOLEAN     | Premium status                               |
-| plan_type | VARCHAR(32) | e.g., "weekly", "monthly"                    |
-| expires_at| TIMESTAMPTZ | Subscription expiration time                 |
-| created_at| TIMESTAMPTZ | Row creation time                            |
-
-> For MVP, `weekly` and `monthly` are interpreted as **7 days** and **30 days** from activation.
-> The UI should label these as e.g. "7-day pass", "30-day pass" to match behavior.
-
----
-
-### `profiles` (User 1:N Profile) ✅ NEW
-| Column     | Type        | Description                                  |
-|-----------|-------------|----------------------------------------------|
-| id        | VARCHAR(36) | Primary key                                  |
-| user_id   | VARCHAR(36) | FK → users.id (CASCADE DELETE)               |
-| name      | VARCHAR(100)| Profile name (required)                      |
-| age       | INTEGER     | Age (optional)                               |
-| gender    | VARCHAR(10) | Gender (optional)                            |
-| memo      | TEXT        | Memo/notes (optional)                        |
-| created_at| TIMESTAMPTZ | Creation time                                |
-| updated_at| TIMESTAMPTZ | Last update time                             |
-
-> Each user can have multiple profiles (e.g., girlfriend, date, friend).
-> Profiles are used to personalize LLM prompts with context about the chat partner.
-
----
-
-### `message_history` (Prepared for future use)
-
-| Column       | Type        | Description                                   |
-|--------------|-------------|-----------------------------------------------|
-| id           | VARCHAR(36) | Primary key                                   |
-| user_id      | VARCHAR(36) | FK → users.id                                 |
-| conversation | TEXT        | Input conversation text                       |
-| suggestions  | JSONB       | Generated suggestions (e.g. {"items":[...]}) |
-| created_at   | TIMESTAMPTZ | Creation time                                 |
-
-> MVP: table exists but is not yet populated.  
-> Future: history, analytics, usage limits.
-
----
 
 ## ▶️ Running the API (Local)
 
@@ -329,20 +270,22 @@ Activate a premium subscription for a user.
 **This is MVP logic**: no real app store receipt validation yet, just a simple switch in the DB.
 
 **Request**
-
 ```bash
 curl -X POST "http://127.0.0.1:8000/billing/subscribe" \
   -H "Content-Type: application/json" \
   -d '{
     "user_id": "0653a764-b671-4334-8daa-685b060f2b6e",
-    "plan_type": "monthly"
+    "plan_type": "monthly",
+    "transaction_id": "1000000987654321",
+    "platform": "ios"
   }'
 ```
 
-`plan_type`:
-
-- `"weekly"` → 7 days from now
-- `"monthly"` → 30 days from now
+**Request Body:**
+- `user_id` (required): User ID
+- `plan_type` (required): "weekly" or "monthly"
+- `transaction_id` (optional): Apple/Google transaction ID (for future IAP)
+- `platform` (optional): "ios" or "android" (for future IAP)
 
 **Response**
 

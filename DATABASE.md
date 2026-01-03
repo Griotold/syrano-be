@@ -38,6 +38,9 @@ erDiagram
         timestamptz created_at
         integer daily_usage_count "DEFAULT 0"
         date last_reset_date "NULLABLE"
+        varchar(255) transaction_id "NULLABLE"
+        varchar(10) platform "NULLABLE"
+        varchar(255) original_transaction_id "NULLABLE"
     }
     
     profiles {
@@ -101,11 +104,16 @@ CREATE TABLE subscriptions (
     created_at TIMESTAMP WITH TIME ZONE NOT NULL,
     daily_usage_count INTEGER NOT NULL DEFAULT 0,
     last_reset_date DATE,
+    transaction_id VARCHAR(255),
+    platform VARCHAR(10),
+    original_transaction_id VARCHAR(255),
     
     FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 CREATE UNIQUE INDEX ix_subscriptions_user_id ON subscriptions(user_id);
+CREATE INDEX idx_subscriptions_transaction_id ON subscriptions(transaction_id);
+CREATE INDEX idx_subscriptions_original_transaction_id ON subscriptions(original_transaction_id);
 ```
 
 **컬럼 설명:**
@@ -120,15 +128,25 @@ CREATE UNIQUE INDEX ix_subscriptions_user_id ON subscriptions(user_id);
 | created_at | TIMESTAMPTZ | NOT NULL | 구독 생성 시각 |
 | daily_usage_count | INTEGER | NOT NULL | 오늘 사용 횟수 (무료: 5회 제한) |
 | last_reset_date | DATE | NULLABLE | 마지막 카운터 리셋 날짜 |
+| transaction_id | VARCHAR(255) | NULLABLE | Apple/Google 거래 ID (영수증 검증용) |
+| platform | VARCHAR(10) | NULLABLE | 구독 플랫폼 ('ios' 또는 'android') |
+| original_transaction_id | VARCHAR(255) | NULLABLE | 최초 구독 ID (자동 갱신 추적용) |
 
 **인덱스:**
 - `ix_subscriptions_user_id` (UNIQUE)
+- `idx_subscriptions_transaction_id` (INDEX) - 영수증 검색용
+- `idx_subscriptions_original_transaction_id` (INDEX) - 자동 갱신 추적용
 
 **비즈니스 로직:**
 - 무료 사용자: `daily_usage_count` ≤ 5
 - 프리미엄 사용자: 무제한
 - 자정마다 `daily_usage_count` 리셋
 
+**영수증 필드 사용:**
+
+- transaction_id: 구독 복원 시 기존 구독 검색, 중복 방지, 환불 추적
+- platform: iOS/Android 구분 (영수증 검증 API 선택)
+- original_transaction_id: 자동 갱신 시 동일한 값 유지 (같은 구독 추적)
 ---
 
 ### `profiles`
@@ -229,6 +247,15 @@ CREATE INDEX ix_message_history_user_id ON message_history(user_id);
   - `last_reset_date` (DATE, NULLABLE)
 - 무료/유료 사용량 제한 구현
 
+### v1.3 (2026-01-02)
+**영수증 필드 추가 (구독 복원 준비)**
+
+- `subscriptions` 테이블에 컬럼 추가:
+    - `transaction_id` (VARCHAR(255), NULLABLE, INDEXED)
+    - `platform` (VARCHAR(10), NULLABLE)
+    - `original_transaction_id` (VARCHAR(255), NULLABLE, INDEXED)
+- Apple/Google 영수증 검증 준비
+- 구독 복원 및 자동 갱신 추적 지원
 ---
 
 ## 🛠️ 로컬 개발 환경
