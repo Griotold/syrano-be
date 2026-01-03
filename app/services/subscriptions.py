@@ -26,11 +26,15 @@ async def activate_subscription(
     plan_type: str,
     transaction_id: str | None = None,  # ← 추가
     platform: str | None = None,  # ← 추가
+    original_transaction_id: str | None = None,  # ← 추가
 ) -> Subscription:
     """
     주어진 user_id에 대해 프리미엄 구독을 활성화한다.
     - plan_type: "weekly" 또는 "monthly"
     - expires_at: 단순히 7일/30일 뒤로 설정 (MVP 용도)
+    - transaction_id: Apple/Google 거래 ID (선택)
+    - platform: 'ios' or 'android' (선택)
+    - original_transaction_id: 최초 구독 ID (선택)
     """
     # 만료일 계산 (UTC 기준)
     now = datetime.now(timezone.utc)
@@ -40,13 +44,12 @@ async def activate_subscription(
     elif plan_type == "monthly":
         expires_at = now + timedelta(days=30)
     else:
-        # MVP라 단순하게 처리 - 나중에 plan 정의를 enum/테이블로 분리해도 됨
         raise ValueError(f"Unsupported plan_type: {plan_type}")
 
     # 기존 구독 가져오기
     subscription = await get_subscription_by_user_id(session, user_id)
 
-    # 없으면 새로 생성 (이론상은 항상 있지만, 방어적으로 처리)
+    # 없으면 새로 생성
     if subscription is None:
         subscription = Subscription(
             user_id=user_id,
@@ -58,11 +61,13 @@ async def activate_subscription(
     subscription.expires_at = expires_at
     subscription.transaction_id = transaction_id  # ← 추가
     subscription.platform = platform  # ← 추가
+    subscription.original_transaction_id = original_transaction_id  # ← 추가
 
     await session.commit()
     await session.refresh(subscription)
 
     return subscription
+
 
 async def check_and_update_subscription_status(
     session: AsyncSession,

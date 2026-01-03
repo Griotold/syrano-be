@@ -14,6 +14,9 @@ SQLALCHEMY_ECHO: bool = os.getenv("SQLALCHEMY_ECHO", "true").lower() == "true"
 NAVER_OCR_SECRET_KEY = os.getenv("NAVER_OCR_SECRET_KEY")
 NAVER_OCR_INVOKE_URL = os.getenv("NAVER_OCR_INVOKE_URL")
 
+# Apple App Store
+APPLE_SHARED_SECRET: str = os.getenv("APPLE_SHARED_SECRET", "temporary_value_will_update_after_registration")
+
 if OPENAI_API_KEY is None:
     raise RuntimeError("OPENAI_API_KEY is not set. Please add it to your .env file.")
 
